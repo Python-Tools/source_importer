@@ -1,0 +1,5 @@
+include LICENSE
+include README.rst
+include pmfprc.json
+include requirements.txt
+recursive-include source_importer *.pyx *.pxd *.pxi *.py *.c *.h
