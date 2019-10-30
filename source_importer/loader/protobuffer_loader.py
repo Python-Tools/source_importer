@@ -3,17 +3,20 @@ import sys
 import hashlib
 import shutil
 import warnings
+import subprocess
 from pathlib import Path
 import importlib.util
 from importlib.abc import Loader
-from numpy import f2py
 
 
-class FortranImportLoader(Loader):
+
+
+class ProtoBufferImportLoader(Loader):
     """fortran code's loader."""
 
     def __init__(self, source_path):
         self._source_path = source_path
+        print(self._source_path)
         with open(str(self._source_path), "rb") as f:
             self.source = f.read()
         self.source_hash = hashlib.md5(self.source)
@@ -32,24 +35,20 @@ class FortranImportLoader(Loader):
 
     def _compile(self):
         modulename = self._source_path.stem
-        dir_path = str(Path(self._source_path).parent)
+        proto_path = str(Path(self._source_path).parent)
+        print(proto_path)
+        print(modulename)
         suffix = self._source_path.suffix
-        complie_result = f2py.compile(
-            self.source,
-            modulename=modulename,
-            verbose=False,
-            extra_args="--quiet",
-            extension=suffix
-        )
-        if complie_result != 0:
+        complie_result = subprocess.run(f"protoc --python_out={proto_path} --proto_path={proto_path} {modulename}.proto",shell=True, check=False)
+        if complie_result.returncode != 0:
             raise ImportError("complie failed")
         else:
-            root = Path(dir_path).resolve()
+            root = Path(proto_path).resolve()
             find_files = [
-                i for i in root.iterdir() if i.match(f"{modulename}*.pyd") or i.match(f"{modulename}*.so")
+                i for i in root.iterdir() if i.match(f"{modulename}_pb2.py")
             ]
             if len(find_files) != 1:
-                raise ImportError(f"find {len(find_files)} Dynamic Link Library")
+                raise ImportError(f"find {len(find_files)} pb module")
             file = find_files[0]
             target_path = self._source_path.with_name(file.name)
             if file != target_path:
@@ -70,6 +69,34 @@ class FortranImportLoader(Loader):
 
     def create_module(self, spec):
         self._check_source()
+        target_path = self._compile()
+        self.wrap_spec = importlib.util.spec_from_file_location(
+            spec.name,
+            str(target_path)
+        )
+        mod = importlib.util.module_from_spec(self.wrap_spec)
+        mod = sys.modules.setdefault(spec.name, mod)
+        return mod
+
+    def exec_module(self, module):
+        """在_post_import_hooks中查找对应模块中的回调函数并执行."""
+        self.wrap_spec.loader.exec_module(module)
+
+
+class PyProtoBufferImportLoader(Loader):
+    """fortran code's loader."""
+
+    def __init__(self, source_path):
+        self._source_path = source_path
+        with open(str(self._source_path), "rb") as f:
+            self.source = f.read()
+        self.wrap_spec = None
+    def _compile(self):
+        target_path = self._source_path
+        return target_path
+
+    def create_module(self, spec):
+        
         target_path = self._compile()
         self.wrap_spec = importlib.util.spec_from_file_location(
             spec.name,

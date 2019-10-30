@@ -1,11 +1,11 @@
 import sys
 from pathlib import Path
-p = Path(__file__)
-root = p.parent.parent.parent.absolute()
+p = Path(__file__).absolute()
+print(p)
+root = p.parent.parent.parent.parent.absolute()
+print(root)
 sys.path.append(str(root))
-import fortran_importer
-from sum_of_square import sum_of_square
+import source_importer
+import tutorial
 
-result = sum_of_square([1,2,3,4])
-
-print(result)
+print(tutorial.Person)

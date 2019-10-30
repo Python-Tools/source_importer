@@ -4,7 +4,8 @@ from pathlib import Path
 from importlib.abc import MetaPathFinder
 from importlib.machinery import ModuleSpec
 import numpy
-from source_importer.loader import FortranImportLoader
+from source_importer.loader import ProtoBufferImportLoader, PyProtoBufferImportLoader
+
 
 class ProtoImportFinder(MetaPathFinder):
 
@@ -22,14 +23,16 @@ class ProtoImportFinder(MetaPathFinder):
                     i for i in path_dir.iterdir() if i.match(f"{relative_path}_pb2.py")
                 ]
                 if len(find_files) > 0:
-                    return None
+                    full_path = str(find_files[0])
+                    loader = PyProtoBufferImportLoader(full_path)
+                    spec = ModuleSpec(fullname, loader, origin=paths)
+                    return spec
             # 判断是否是proto模块
             if abs_path.with_suffix(".proto").exists():
-                full_path = abs_path.with_suffix(".f")
-                break
+                full_path = abs_path.with_suffix(".proto")
+                loader = ProtoBufferImportLoader(full_path)
+                spec = ModuleSpec(fullname, loader, origin=paths)
+                return spec
         else:
             # 都不是就跳过
             return None
-        loader = FortranImportLoader(full_path)
-        spec = ModuleSpec(fullname, loader, origin=paths)
-        return spec
